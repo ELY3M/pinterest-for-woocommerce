@@ -119,8 +119,28 @@ class PinterestSyncSettings {
 			$response    = APIV5::get_advertiser_tag( $advertiser_id, $tag_id );
 			$aem_enabled = $response['configs']['aem_enabled'] ?? false;
 			Pinterest_For_Woocommerce()::save_setting( 'automatic_enhanced_match_support', $aem_enabled );
+			ManualConfig::clear_last_error();
 		} catch ( Exception $th ) {
-			Logger::log( $th->getMessage(), 'error' );
+			Logger::log( 'Settings sync failed: ' . $th->getMessage() . ' (HTTP ' . $th->getCode() . ')', 'error' );
+
+			/*
+			 * With a manually entered token, reading the tag back from Ads Manager is only a
+			 * convenience: keep the local value instead of failing the whole Settings page,
+			 * and show the real reason on the Pinterest Setup page.
+			 */
+			if ( ManualConfig::is_enabled() ) {
+				ManualConfig::record_last_error(
+					sprintf(
+						/* translators: 1: ad account ID, 2: tag ID, 3: error message */
+						__( 'Reading Pinterest Tag %2$s from ad account %1$s failed: %3$s', 'pinterest-for-woocommerce' ),
+						$advertiser_id ?? '',
+						$tag_id ?? '',
+						ManualConfig::describe_exception( $th )
+					)
+				);
+				return (bool) Pinterest_For_Woocommerce()::get_setting( 'automatic_enhanced_match_support' );
+			}
+
 			throw new Exception( esc_html__( 'Response error', 'pinterest-for-woocommerce' ), 400 );
 		}
 

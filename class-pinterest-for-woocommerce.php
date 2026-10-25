@@ -42,7 +42,7 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce' ) ) :
 	 * Base Plugin class holding generic functionality
 	 *
 	 * @class   Pinterest_For_Woocommerce
-	 * @version x.x.x
+	 * @version 1.6.0
 	 */
 	final class Pinterest_For_Woocommerce {
 
@@ -460,11 +460,6 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce' ) ) :
 
 			$errors = array();
 			global $wp_version;
-			/**
-			 * The WordPress version string.
-			 *
-			 * @var string $wp_version
-			 */
 
 			if ( ! version_compare( PHP_VERSION, self::PLUGIN_REQUIREMENTS['php_version'], '>=' ) ) {
 				/* Translators: The minimum PHP version */
@@ -688,7 +683,7 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce' ) ) :
 		 *
 		 * @since 1.4.0
 		 *
-		 * @return mixed The stored API version ('v3' or 'v5'), or '' when none is stored.
+		 * @return string The API version.
 		 */
 		public static function get_api_version() {
 			return get_option( PINTEREST_FOR_WOOCOMMERCE_PINTEREST_API_VERSION, '' );
@@ -758,7 +753,7 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce' ) ) :
 		public function init_api_endpoints() {
 			new Pinterest\API\Advertisers();
 			new Pinterest\API\AdvertiserConnect();
-			//new Pinterest\API\Auth(); //this NEVER worked for me!!!  look at https://github.com/woocommerce/pinterest-for-woocommerce/issues/1141
+			///new Pinterest\API\Auth(); //this NEVER worked for me!!!  look at https://github.com/woocommerce/pinterest-for-woocommerce/issues/1141
 			new Pinterest\API\AuthDisconnect();
 			new Pinterest\API\Businesses();
 			new Pinterest\API\DomainVerification();

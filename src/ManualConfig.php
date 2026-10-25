@@ -44,6 +44,11 @@ class ManualConfig {
 	const APPLIED_HASH_KEY = 'manual_config_hash';
 
 	/**
+	 * Option holding the last Pinterest API error seen while syncing with Ads Manager.
+	 */
+	const LAST_ERROR_OPTION = 'pinterest_for_woocommerce_manual_config_last_error';
+
+	/**
 	 * Admin-post actions.
 	 */
 	const SAVE_ACTION  = 'pinterest_for_woocommerce_save_manual_config';
@@ -164,6 +169,67 @@ class ManualConfig {
 			Logger::log( 'Could not decrypt the manually configured Pinterest access token. Please enter it again on the Pinterest configuration page.', 'error' );
 			return '';
 		}
+	}
+
+	/**
+	 * Turns an API exception into a readable explanation, with a hint for the usual causes.
+	 *
+	 * @param Throwable $th The exception.
+	 * @return string
+	 */
+	public static function describe_exception( Throwable $th ): string {
+		$http    = (int) $th->getCode();
+		$message = trim( wp_strip_all_tags( (string) $th->getMessage() ) );
+		$text    = sprintf( 'HTTP %d%s', $http, '' !== $message ? ' - ' . $message : '' );
+
+		if ( $th instanceof PinterestApiException && $th->get_pinterest_code() && $th->get_pinterest_code() !== $http ) {
+			$text .= sprintf( ' (Pinterest code %d)', $th->get_pinterest_code() );
+		}
+
+		switch ( $http ) {
+			case 401:
+				$hint = __( 'Pinterest rejected the access token. It may be expired, a sandbox token, or a Conversions-only token from Ads Manager, which cannot read your account, ad account or tag. Use an OAuth access token from your app on developers.pinterest.com.', 'pinterest-for-woocommerce' );
+				break;
+			case 403:
+				$hint = __( 'The token is valid but is not allowed to do this. Make sure it has the ads:read scope and that the Pinterest user who created it has access to this ad account.', 'pinterest-for-woocommerce' );
+				break;
+			case 404:
+				$hint = __( 'Pinterest could not find it. Check that the Ad Account ID is right and that the Pinterest Tag ID belongs to that same ad account.', 'pinterest-for-woocommerce' );
+				break;
+			case 1:
+				$hint = __( 'Your server could not reach api.pinterest.com.', 'pinterest-for-woocommerce' );
+				break;
+			default:
+				$hint = '';
+		}
+
+		return '' !== $hint ? $text . ' — ' . $hint : $text;
+	}
+
+	/**
+	 * Remembers the last Ads Manager sync error so it can be shown on the configuration page.
+	 *
+	 * @param string $message Error message.
+	 * @return void
+	 */
+	public static function record_last_error( string $message ) {
+		update_option(
+			self::LAST_ERROR_OPTION,
+			array(
+				'message' => $message,
+				'time'    => time(),
+			),
+			false
+		);
+	}
+
+	/**
+	 * Clears the remembered Ads Manager sync error.
+	 *
+	 * @return void
+	 */
+	public static function clear_last_error() {
+		delete_option( self::LAST_ERROR_OPTION );
 	}
 
 	/**
@@ -451,23 +517,48 @@ class ManualConfig {
 				sprintf(
 					/* translators: %s: error message */
 					__( 'Configuration saved, but Pinterest did not accept the access token: %s', 'pinterest-for-woocommerce' ),
-					$th->getMessage()
+					self::describe_exception( $th )
 				),
 			);
 		}
 
 		if ( '' !== $config['advertiser_id'] ) {
+			$ad_account_ok = true;
 			try {
 				APIV5::make_request( 'ad_accounts/' . $config['advertiser_id'], 'GET' );
 			} catch ( Throwable $th ) {
-				$messages[] = array(
+				$ad_account_ok = false;
+				$messages[]    = array(
 					'warning',
 					sprintf(
 						/* translators: %s: error message */
-						__( 'Could not read the ad account with this token. Check the Ad Account ID and that the token has the ads:read scope. (%s)', 'pinterest-for-woocommerce' ),
-						$th->getMessage()
+						__( 'Could not read ad account %1$s with this token: %2$s', 'pinterest-for-woocommerce' ),
+						$config['advertiser_id'],
+						self::describe_exception( $th )
 					),
 				);
+			}
+
+			// The same call the Settings page makes when it syncs with Ads Manager.
+			if ( $ad_account_ok && '' !== $config['tag_id'] ) {
+				try {
+					$tag = APIV5::get_advertiser_tag( $config['advertiser_id'], $config['tag_id'] );
+					self::clear_last_error();
+					if ( isset( $tag['configs']['aem_enabled'] ) ) {
+						Pinterest_For_Woocommerce::save_setting( 'automatic_enhanced_match_support', (bool) $tag['configs']['aem_enabled'] );
+					}
+				} catch ( Throwable $th ) {
+					$messages[] = array(
+						'warning',
+						sprintf(
+							/* translators: 1: tag ID, 2: ad account ID, 3: error message */
+							__( 'Could not read Pinterest Tag %1$s in ad account %2$s: %3$s', 'pinterest-for-woocommerce' ),
+							$config['tag_id'],
+							$config['advertiser_id'],
+							self::describe_exception( $th )
+						),
+					);
+				}
 			}
 		} else {
 			$messages[] = array( 'warning', __( 'No Ad Account ID set: the product catalog sync and the Conversions API need it.', 'pinterest-for-woocommerce' ) );
@@ -488,6 +579,7 @@ class ManualConfig {
 		check_admin_referer( self::CLEAR_ACTION );
 
 		delete_option( self::OPTION );
+		self::clear_last_error();
 		self::reset_api_token_cache();
 		Pinterest_For_Woocommerce::disconnect();
 
@@ -532,6 +624,18 @@ class ManualConfig {
 				foreach ( $notices as $notice ) {
 					printf( '<div class="notice notice-%1$s is-dismissible"><p>%2$s</p></div>', esc_attr( $notice[0] ), esc_html( $notice[1] ) );
 				}
+			}
+			?>
+
+			<?php
+			$last_error = get_option( self::LAST_ERROR_OPTION );
+			if ( is_array( $last_error ) && ! empty( $last_error['message'] ) ) {
+				printf(
+					'<div class="notice notice-warning"><p><strong>%1$s</strong> %2$s<br /><small>%3$s</small></p></div>',
+					esc_html__( 'Last sync with Pinterest Ads Manager failed:', 'pinterest-for-woocommerce' ),
+					esc_html( $last_error['message'] ),
+					esc_html( wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $last_error['time'] ) )
+				);
 			}
 			?>
 

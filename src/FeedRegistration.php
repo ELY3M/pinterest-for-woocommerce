@@ -64,6 +64,12 @@ class FeedRegistration {
 	 */
 	public function init() {
 		add_action( self::ACTION_HANDLE_FEED_REGISTRATION, array( $this, 'handle_feed_registration' ) );
+
+		// A Conversions token cannot register feeds: the feed URL is added in Pinterest by hand.
+		if ( ManualConfig::is_conversions_only() ) {
+			return;
+		}
+
 		if ( false === as_has_scheduled_action( self::ACTION_HANDLE_FEED_REGISTRATION, array(), PINTEREST_FOR_WOOCOMMERCE_PREFIX ) ) {
 			as_schedule_recurring_action( time() + 10, 10 * MINUTE_IN_SECONDS, self::ACTION_HANDLE_FEED_REGISTRATION, array(), PINTEREST_FOR_WOOCOMMERCE_PREFIX );
 		}
@@ -91,6 +97,10 @@ class FeedRegistration {
 	 * @throws Throwable                   Any other exception.
 	 */
 	public function handle_feed_registration(): bool {
+
+		if ( ManualConfig::is_conversions_only() ) {
+			return true;
+		}
 
 		// Clean merchants error code.
 		$this->clear_merchant_error_code();

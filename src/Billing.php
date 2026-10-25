@@ -33,7 +33,7 @@ class Billing {
 	 * @return void
 	 */
 	public static function schedule_event() {
-		if ( ! Pinterest_For_Woocommerce::is_connected() ) {
+		if ( ! Pinterest_For_Woocommerce::is_connected() || ManualConfig::is_conversions_only() ) {
 			return;
 		}
 

@@ -1130,6 +1130,12 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce' ) ) :
 		 * @throws Exception PHP Exception.
 		 */
 		public static function update_account_data() {
+			// A Conversions token cannot read the account: keep the manually configured account data.
+			if ( Pinterest\ManualConfig::is_conversions_only() ) {
+				$account_data = self::get_setting( 'account_data' );
+				return is_array( $account_data ) ? $account_data : array();
+			}
+
 			try {
 				$account_data = Pinterest\API\APIV5::get_account_info();
 

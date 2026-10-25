@@ -84,6 +84,14 @@ class Base {
 	 * @throws PinterestApiException Pinterest API exception in case of API error in response.
 	 */
 	public static function make_request( $endpoint, $method = 'POST', $payload = array(), $api = '', $cache_expiry = false ) {
+		// A Conversions token from Ads Manager can only send conversion events: skip every other call.
+		if ( ! \Automattic\WooCommerce\Pinterest\ManualConfig::is_api_request_allowed( $endpoint ) ) {
+			throw new PinterestApiException(
+				array( 'message' => "Skipped {$method} {$endpoint}: the configured Conversions token can only send conversion events." ),
+				403
+			);
+		}
+
 		$api = empty( $api ) ? '' : trailingslashit( $api );
 		if ( ! empty( $cache_expiry ) ) {
 			$cache = self::get_cached_response( $endpoint, $method, $payload, $api );

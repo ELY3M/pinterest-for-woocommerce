@@ -13,6 +13,9 @@ namespace Automattic\WooCommerce\Pinterest;
 
 use Automattic\WooCommerce\Pinterest\API\APIV5;
 use Automattic\WooCommerce\Pinterest\API\Base;
+use Automattic\WooCommerce\Pinterest\FeedRegistration;
+use Automattic\WooCommerce\Pinterest\LocalFeedConfigs;
+use Automattic\WooCommerce\Pinterest\ProductSync;
 use Automattic\WooCommerce\Pinterest\Utilities\Utilities;
 use Defuse\Crypto\Crypto as DefuseCrypto;
 use Pinterest_For_Woocommerce;
@@ -110,6 +113,9 @@ class ManualConfig {
 			'access_token'        => '', // Encrypted.
 			'domain_verify_code'  => '',
 			'domain_verified'     => true,
+			// 'conversions': Conversions token from Ads Manager (can only send events).
+			// 'oauth': full API access token from a Pinterest developer app.
+			'token_type'          => 'conversions',
 		);
 	}
 
@@ -130,6 +136,49 @@ class ManualConfig {
 	 */
 	public static function is_enabled(): bool {
 		return '' !== self::get_config()['access_token'];
+	}
+
+	/**
+	 * Whether the configured token is a Conversions token from Ads Manager.
+	 *
+	 * Such a token can only send conversion events: it cannot read the account, the ad
+	 * account, the tag or the catalogs, and Pinterest does not allow adding scopes to it.
+	 *
+	 * @return bool
+	 */
+	public static function is_conversions_only(): bool {
+		return self::is_enabled() && 'oauth' !== self::get_config()['token_type'];
+	}
+
+	/**
+	 * Whether a Pinterest API v5 endpoint may be called with the configured token.
+	 *
+	 * @param string $endpoint Endpoint relative to the API root, e.g. "ad_accounts/123/events".
+	 * @return bool
+	 */
+	public static function is_api_request_allowed( $endpoint ): bool {
+		if ( ! self::is_conversions_only() ) {
+			return true;
+		}
+		return (bool) preg_match( '#^ad_accounts/[^/?]+/events(\?|$)#', ltrim( (string) $endpoint, '/' ) );
+	}
+
+	/**
+	 * URL of the product feed file the plugin generates.
+	 *
+	 * @return string Empty when the feed is not configured yet.
+	 */
+	public static function get_feed_url(): string {
+		if ( ! class_exists( LocalFeedConfigs::class ) ) {
+			return '';
+		}
+		try {
+			$configs = LocalFeedConfigs::get_instance()->get_configurations();
+			$config  = is_array( $configs ) ? reset( $configs ) : false;
+			return is_array( $config ) ? (string) ( $config['feed_url'] ?? '' ) : '';
+		} catch ( Throwable $th ) {
+			return '';
+		}
 	}
 
 	/**
@@ -376,6 +425,11 @@ class ManualConfig {
 
 		Pinterest_For_Woocommerce::set_api_version( 'v5' );
 
+		// A Conversions token cannot register feeds; the feed URL is added in Pinterest by hand.
+		if ( self::is_conversions_only() && function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( FeedRegistration::ACTION_HANDLE_FEED_REGISTRATION, array(), PINTEREST_FOR_WOOCOMMERCE_PREFIX );
+		}
+
 		if ( ! Utilities::get_account_connection_timestamp() ) {
 			Utilities::set_account_connection_timestamp();
 		}
@@ -463,6 +517,7 @@ class ManualConfig {
 			'access_token'       => $old['access_token'],
 			'domain_verify_code' => self::sanitize_id( $_POST['domain_verify_code'] ?? '' ),
 			'domain_verified'    => ! empty( $_POST['domain_verified'] ),
+			'token_type'         => ( isset( $_POST['token_type'] ) && 'oauth' === $_POST['token_type'] ) ? 'oauth' : 'conversions',
 		);
 
 		$new_token = trim( sanitize_text_field( wp_unslash( $_POST['access_token'] ?? '' ) ) );
@@ -486,6 +541,11 @@ class ManualConfig {
 		// Make sure the plugin uses the new token before checking it.
 		Pinterest_For_Woocommerce::save_data( self::APPLIED_HASH_KEY, '' );
 		self::apply();
+
+		if ( 'oauth' !== $config['token_type'] ) {
+			self::clear_last_error();
+			self::redirect_back( array_merge( $messages, self::check_conversions_token( $config ) ) );
+		}
 
 		// Check the token against Pinterest and fill in what is missing.
 		try {
@@ -565,6 +625,71 @@ class ManualConfig {
 		}
 
 		self::redirect_back( $messages );
+	}
+
+	/**
+	 * Checks a Conversions token by sending Pinterest a test event (not recorded).
+	 *
+	 * @param array $config The saved configuration.
+	 * @return array List of [type, message] notices.
+	 */
+	protected static function check_conversions_token( array $config ): array {
+		$messages = array();
+
+		if ( '' === $config['advertiser_id'] ) {
+			return array( array( 'error', __( 'Configuration saved, but the Ad Account ID is required: conversion events are sent to that ad account.', 'pinterest-for-woocommerce' ) ) );
+		}
+
+		// The Conversions API is the reason to have this token: turn it on.
+		Pinterest_For_Woocommerce::save_setting( 'track_conversions', true );
+		Pinterest_For_Woocommerce::save_setting( 'track_conversions_capi', true );
+
+		$ip         = class_exists( 'WC_Geolocation' ) ? \WC_Geolocation::get_ip_address() : '';
+		$user_agent = function_exists( 'wc_get_user_agent' ) ? wc_get_user_agent() : '';
+		$event      = array(
+			'event_name'       => 'page_visit',
+			'action_source'    => 'web',
+			'event_time'       => time(),
+			'event_id'         => 'pfw-setup-test-' . wp_generate_password( 12, false, false ),
+			'event_source_url' => home_url( '/' ),
+			'user_data'        => array(
+				'client_ip_address' => '' !== $ip ? $ip : '127.0.0.1',
+				'client_user_agent' => '' !== $user_agent ? $user_agent : 'Pinterest for WooCommerce setup test',
+			),
+		);
+
+		try {
+			$response = APIV5::make_request(
+				'ad_accounts/' . $config['advertiser_id'] . '/events?test=true',
+				'POST',
+				array( 'data' => array( $event ) )
+			);
+			$result   = $response['events'][0] ?? array();
+			if ( ! empty( $result['error_message'] ) ) {
+				$messages[] = array(
+					'warning',
+					sprintf(
+						/* translators: %s: error message */
+						__( 'Configuration saved. Pinterest accepted the token but reported a problem with the test event: %s', 'pinterest-for-woocommerce' ),
+						$result['error_message']
+					),
+				);
+			} else {
+				$messages[] = array( 'success', __( 'Configuration saved. Pinterest accepted a test conversion event with this token, so the Pinterest Tag and the Conversions API are ready.', 'pinterest-for-woocommerce' ) );
+			}
+		} catch ( Throwable $th ) {
+			$messages[] = array(
+				'warning',
+				sprintf(
+					/* translators: 1: ad account ID, 2: error message */
+					__( 'Configuration saved, but Pinterest refused a test conversion event for ad account %1$s: %2$s', 'pinterest-for-woocommerce' ),
+					$config['advertiser_id'],
+					self::describe_exception( $th )
+				),
+			);
+		}
+
+		return $messages;
 	}
 
 	/**
@@ -650,16 +775,50 @@ class ManualConfig {
 				</p>
 			<?php endif; ?>
 
+			<?php
+			if ( self::is_conversions_only() ) :
+				$feed_url = self::get_feed_url();
+				?>
+				<div class="card" style="max-width: 820px;">
+					<h2><?php esc_html_e( 'Product catalog', 'pinterest-for-woocommerce' ); ?></h2>
+					<?php if ( '' !== $feed_url && ProductSync::is_product_sync_enabled() ) : ?>
+						<p><?php esc_html_e( 'Your products are written to this feed file and kept up to date by the plugin. Add it once in Pinterest: Ads Manager → Catalogs → Data sources → Add data source, choose "Add a data source URL", and paste this URL (format XML, daily updates).', 'pinterest-for-woocommerce' ); ?></p>
+						<p><input type="text" class="large-text code" readonly value="<?php echo esc_attr( $feed_url ); ?>" onclick="this.select();" /></p>
+						<p class="description"><?php esc_html_e( 'The file appears a few minutes after saving, once the first feed generation has finished. Your website must be claimed on Pinterest before it accepts the feed.', 'pinterest-for-woocommerce' ); ?></p>
+					<?php else : ?>
+						<p><?php esc_html_e( 'The feed URL appears here once product sync is on: tick the domain verification box below and keep "Enable product sync" on in the plugin settings.', 'pinterest-for-woocommerce' ); ?></p>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
+
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" autocomplete="off">
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_ACTION ); ?>" />
 				<?php wp_nonce_field( self::SAVE_ACTION ); ?>
 
 				<table class="form-table" role="presentation">
 					<tr>
+						<th scope="row"><?php esc_html_e( 'Token type', 'pinterest-for-woocommerce' ); ?></th>
+						<td>
+							<fieldset>
+								<label>
+									<input type="radio" name="token_type" value="conversions" <?php checked( 'oauth' !== $config['token_type'] ); ?> />
+									<?php esc_html_e( 'Conversions token from Ads Manager', 'pinterest-for-woocommerce' ); ?>
+								</label>
+								<p class="description"><?php esc_html_e( 'Ads Manager → Conversions → Conversion access token. Runs the Pinterest Tag and the Conversions API. The product catalog is added in Pinterest with the feed URL shown below, because this token cannot manage catalogs.', 'pinterest-for-woocommerce' ); ?></p>
+								<br />
+								<label>
+									<input type="radio" name="token_type" value="oauth" <?php checked( 'oauth', $config['token_type'] ); ?> />
+									<?php esc_html_e( 'Full API access token from a Pinterest developer app', 'pinterest-for-woocommerce' ); ?>
+								</label>
+								<p class="description"><?php esc_html_e( 'A token from your own app on developers.pinterest.com with the scopes listed below. The plugin then also registers the catalog feed and reads billing and tag settings.', 'pinterest-for-woocommerce' ); ?></p>
+							</fieldset>
+						</td>
+					</tr>
+					<tr>
 						<th scope="row"><label for="pfw-access-token"><?php esc_html_e( 'Access token', 'pinterest-for-woocommerce' ); ?></label></th>
 						<td>
 							<input type="password" id="pfw-access-token" name="access_token" class="regular-text code" value="" placeholder="<?php echo $has_token ? esc_attr__( '•••••••• saved — leave blank to keep', 'pinterest-for-woocommerce' ) : 'pina_...'; ?>" autocomplete="new-password" />
-							<p class="description"><?php esc_html_e( 'Pinterest API v5 access token (e.g. from your app on developers.pinterest.com). Recommended scopes: user_accounts:read, ads:read, ads:write, catalogs:read, catalogs:write.', 'pinterest-for-woocommerce' ); ?></p>
+							<p class="description"><?php esc_html_e( 'For a full API access token, the scopes needed are: user_accounts:read, ads:read, ads:write, catalogs:read, catalogs:write.', 'pinterest-for-woocommerce' ); ?></p>
 						</td>
 					</tr>
 					<tr>

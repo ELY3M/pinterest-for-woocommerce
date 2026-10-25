@@ -108,6 +108,11 @@ class PinterestSyncSettings {
 			return false;
 		}
 
+		// A Conversions token cannot read the tag: keep the local value.
+		if ( ManualConfig::is_conversions_only() ) {
+			return (bool) Pinterest_For_Woocommerce()::get_setting( 'automatic_enhanced_match_support' );
+		}
+
 		try {
 			$advertiser_id = Pinterest_For_WooCommerce()::get_setting( 'tracking_advertiser' );
 			$tag_id        = Pinterest_For_WooCommerce()::get_setting( 'tracking_tag' );

@@ -239,6 +239,20 @@ class FeedState extends VendorAPI {
 			'pinterest-for-woocommerce'
 		);
 
+		if ( Pinterest\ManualConfig::is_conversions_only() ) {
+			$result['workflow'][] = array(
+				'label'        => esc_html__( 'Remote feed setup', 'pinterest-for-woocommerce' ),
+				'status'       => 'pending',
+				'status_label' => esc_html__( 'Add the feed URL as a data source in Pinterest Ads Manager → Catalogs.', 'pinterest-for-woocommerce' ),
+				'extra_info'   => sprintf(
+					'<a href="%1$s">%2$s</a>',
+					esc_url( Pinterest\ManualConfig::get_page_url() ),
+					esc_html( $this->get_feed_url() )
+				),
+			);
+			return $result;
+		}
+
 		$status = FeedStatusService::get_feed_registration_status();
 		if ( FeedStatusService::FEED_STATUS_NOT_REGISTERED === $status ) {
 			$status       = 'pending';

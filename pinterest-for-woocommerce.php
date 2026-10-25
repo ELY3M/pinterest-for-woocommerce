@@ -13,7 +13,7 @@
  * Plugin Name:       Pinterest for WooCommerce with manual config
  * Plugin URI:        https://github.com/ELY3M/pinterest-for-woocommerce/tree/elys
  * Description:       Grow your business on Pinterest! Use this official plugin to allow shoppers to Pin products while browsing your store, track conversions, and advertise on Pinterest.
- * Version:           1.6.0
+ * Version:           9991.6.0
  * Author:            WooCommerce
  * Author URI:        https://github.com/ELY3M/pinterest-for-woocommerce/tree/elys
  * License:           GNU General Public License v3.0

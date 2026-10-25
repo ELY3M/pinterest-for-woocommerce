@@ -24,14 +24,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Generates browser PageVisit events and handles their CAPI beacons.
  *
  * @class   PageVisit
- * @version x.x.x
+ * @version 1.5.4
  */
 class PageVisit {
 
 	/**
 	 * Public AJAX action used by the PageVisit beacon.
-	 *
-	 * @var string
 	 */
 	const AJAX_ACTION = 'pinterest_for_woocommerce_page_visit';
 

@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @class   TokenExchangeV3ToV5
  * @since   1.4.0
- * @version x.x.x
+ * @version 1.5.4
  */
 class TokenExchangeV3ToV5 extends APIV5 {
 
@@ -116,7 +116,7 @@ class TokenExchangeV3ToV5 extends APIV5 {
 	 *
 	 * @since 1.4.0
 	 *
-	 * @return mixed The stored V3 token data, with its access token decrypted.
+	 * @return string $token The V3 token.
 	 */
 	public static function get_token() {
 		$token = Pinterest_For_Woocommerce()::get_data( 'token', true );

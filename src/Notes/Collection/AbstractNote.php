@@ -25,15 +25,10 @@ defined( 'ABSPATH' ) || exit;
  *
  * @class   AbstractNote
  * @since   1.1.0
- * @version x.x.x
+ * @version 1.6.0
  */
 abstract class AbstractNote {
 
-	/**
-	 * Name of the note.
-	 *
-	 * @var string
-	 */
 	const NOTE_NAME = '';
 
 	/**

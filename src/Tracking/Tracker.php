@@ -15,7 +15,7 @@ use Throwable;
  * Interface for Pinterest tracker implementations.
  *
  * @class   Tracker
- * @version x.x.x
+ * @version 1.5.1
  */
 abstract class Tracker {
 
@@ -23,8 +23,6 @@ abstract class Tracker {
 	 * Maps tracking events to corresponding tracker methods and conversions API events names.
 	 *
 	 * @since 1.4.0
-	 *
-	 * @var array<string, string>
 	 */
 	const EVENT_MAP = array(
 		Tracking::EVENT_PAGE_VISIT    => 'page_visit',

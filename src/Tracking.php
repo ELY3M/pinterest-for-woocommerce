@@ -29,43 +29,18 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Class Tracker responsible for hooking into system events.
  *
  * @class   Tracking
- * @version x.x.x
+ * @version 1.6.0
  */
 class Tracking {
 
-	/**
-	 * Checkout event name.
-	 *
-	 * @var string
-	 */
 	const EVENT_CHECKOUT      = 'Checkout';
 
-	/**
-	 * Add to cart event name.
-	 *
-	 * @var string
-	 */
 	const EVENT_ADD_TO_CART   = 'AddToCart';
 
-	/**
-	 * Page visit event name.
-	 *
-	 * @var string
-	 */
 	const EVENT_PAGE_VISIT    = 'PageVisit';
 
-	/**
-	 * Search event name.
-	 *
-	 * @var string
-	 */
 	const EVENT_SEARCH        = 'Search';
 
-	/**
-	 * View category event name.
-	 *
-	 * @var string
-	 */
 	const EVENT_VIEW_CATEGORY = 'ViewCategory';
 
 	/**

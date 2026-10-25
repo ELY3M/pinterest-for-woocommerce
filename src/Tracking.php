@@ -12,6 +12,7 @@ use Automattic\WooCommerce\Pinterest\Tracking\Conversions;
 use Automattic\WooCommerce\Pinterest\Tracking\Data;
 use Automattic\WooCommerce\Pinterest\Tracking\Data\Category;
 use Automattic\WooCommerce\Pinterest\Tracking\Data\Checkout;
+use Automattic\WooCommerce\Pinterest\Tracking\Data\InitiateCheckout;
 use Automattic\WooCommerce\Pinterest\Tracking\Data\None;
 use Automattic\WooCommerce\Pinterest\Tracking\Data\Product;
 use Automattic\WooCommerce\Pinterest\Tracking\Data\Search;
@@ -42,6 +43,22 @@ class Tracking {
 	const EVENT_SEARCH        = 'Search';
 
 	const EVENT_VIEW_CATEGORY = 'ViewCategory';
+
+	const EVENT_INITIATE_CHECKOUT = 'InitiateCheckout';
+
+	/**
+	 * WooCommerce session key holding the last cart reported as InitiateCheckout.
+	 *
+	 * @var string
+	 */
+	private const INITIATE_CHECKOUT_SESSION_KEY = 'pinterest_for_woocommerce_initiate_checkout';
+
+	/**
+	 * How long, in seconds, reopening the checkout with an unchanged cart is not reported again.
+	 *
+	 * @var int
+	 */
+	private const INITIATE_CHECKOUT_REPEAT_WINDOW = 30 * MINUTE_IN_SECONDS;
 
 	/**
 	 * WooCommerce session key holding recently reported AddToCart signatures.
@@ -107,6 +124,9 @@ class Tracking {
 
 		// Tracks checkout events.
 		add_action( 'woocommerce_before_thankyou', array( $this, 'handle_checkout' ), 10, 1 );
+
+		// Tracks initiate checkout events (customer opens the checkout page).
+		add_action( 'wp_footer', array( $this, 'handle_initiate_checkout' ) );
 
 		array_walk(
 			$this->trackers,
@@ -496,6 +516,103 @@ class Tracking {
 			$items
 		);
 		$this->track_event( static::EVENT_CHECKOUT, $data );
+	}
+
+	/**
+	 * Used as a callback for the wp_footer hook: reports the customer's cart when they
+	 * open the checkout page (classic or block checkout).
+	 *
+	 * Reloading the checkout with the same cart is not reported again within
+	 * INITIATE_CHECKOUT_REPEAT_WINDOW, and the event ID is derived from the cart and the
+	 * customer session so Pinterest can deduplicate the Tag and Conversions API events.
+	 *
+	 * @return void
+	 */
+	public function handle_initiate_checkout() {
+		if ( ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+			return;
+		}
+
+		// The thank-you page reports Checkout; the order-pay page pays an existing order.
+		if ( is_wc_endpoint_url( 'order-received' ) || is_wc_endpoint_url( 'order-pay' ) ) {
+			return;
+		}
+
+		/**
+		 * Filters whether to track the InitiateCheckout event.
+		 *
+		 * @param bool $track Whether to track the event. Default true.
+		 */
+		if ( ! apply_filters( 'pinterest_for_woocommerce_track_initiate_checkout', true ) ) {
+			return;
+		}
+
+		if ( ! function_exists( 'WC' ) || ! isset( WC()->cart ) || WC()->cart->is_empty() ) {
+			return;
+		}
+
+		$cart      = WC()->cart;
+		$cart_hash = (string) $cart->get_cart_hash();
+		$session   = isset( WC()->session ) ? WC()->session : false;
+		$customer  = $session ? (string) $session->get_customer_id() : '';
+
+		if ( $session ) {
+			$last = $session->get( self::INITIATE_CHECKOUT_SESSION_KEY );
+			if ( is_array( $last ) && ( $last['hash'] ?? '' ) === $cart_hash && time() - (int) ( $last['time'] ?? 0 ) < self::INITIATE_CHECKOUT_REPEAT_WINDOW ) {
+				return;
+			}
+			$session->set(
+				self::INITIATE_CHECKOUT_SESSION_KEY,
+				array(
+					'hash' => $cart_hash,
+					'time' => time(),
+				)
+			);
+		}
+
+		$items          = array();
+		$total_quantity = 0;
+		$cart_value     = 0;
+		foreach ( $cart->get_cart() as $cart_item ) {
+			$product = $cart_item['data'] ?? null;
+			if ( ! $product instanceof \WC_Product ) {
+				continue;
+			}
+
+			$quantity   = (int) ( $cart_item['quantity'] ?? 0 );
+			$line_total = (float) ( $cart_item['line_total'] ?? 0 );
+			$item_price = $quantity > 0 ? $line_total / $quantity : 0;
+
+			// Variations have no categories of their own.
+			$category_id = $product->get_parent_id() ? $product->get_parent_id() : $product->get_id();
+
+			$items[] = new Product(
+				uniqid( 'product' ),
+				$product->get_id(),
+				$product->get_name(),
+				wc_get_product_category_list( $category_id ),
+				'brand',
+				wc_format_decimal( $item_price, wc_get_price_decimals() ),
+				get_woocommerce_currency(),
+				$quantity
+			);
+
+			$total_quantity += $quantity;
+			$cart_value     += $line_total;
+		}
+
+		if ( empty( $items ) ) {
+			return;
+		}
+
+		$data = new InitiateCheckout(
+			'initiate_checkout_' . substr( md5( $customer . '|' . $cart_hash ), 0, 24 ),
+			wc_format_decimal( $cart_value, wc_get_price_decimals() ),
+			$total_quantity,
+			get_woocommerce_currency(),
+			$items
+		);
+		$this->track_event( static::EVENT_INITIATE_CHECKOUT, $data );
 	}
 
 	/**

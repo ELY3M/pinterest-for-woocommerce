@@ -30,6 +30,7 @@ abstract class Tracker {
 		Tracking::EVENT_VIEW_CATEGORY => 'view_category',
 		Tracking::EVENT_ADD_TO_CART   => 'add_to_cart',
 		Tracking::EVENT_CHECKOUT      => 'checkout',
+		Tracking::EVENT_INITIATE_CHECKOUT => 'initiate_checkout',
 	);
 
 	/**

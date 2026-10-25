@@ -211,6 +211,21 @@ class Conversions extends Tracker {
 	}
 
 	/**
+	 * Prepares data for the initiate checkout event: the checkout data without an order ID.
+	 *
+	 * @see Conversions::prepare_request_data()
+	 *
+	 * @param Checkout $data Initiate checkout data.
+	 *
+	 * @return array Prepared initiate checkout event specific data.
+	 */
+	private function get_initiate_checkout_data( Checkout $data ) {
+		$prepared = $this->get_checkout_data( $data );
+		unset( $prepared['custom_data']['order_id'] );
+		return $prepared;
+	}
+
+	/**
 	 * Returns the hashed email of the current user if any.
 	 *
 	 * @return string|false Hashed email or false if not available.

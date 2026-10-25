@@ -391,6 +391,21 @@ class Tag extends Tracker {
 	}
 
 	/**
+	 * Prepares data for initiate checkout event: the checkout data without an order ID.
+	 *
+	 * @see Tag::prepare_request_data()
+	 *
+	 * @param Checkout $data Initiate checkout tracking data.
+	 *
+	 * @return array Prepared request data.
+	 */
+	private function get_initiate_checkout_data( Checkout $data ) {
+		$prepared = $this->get_checkout_data( $data );
+		unset( $prepared['order_id'] );
+		return $prepared;
+	}
+
+	/**
 	 * Prepares data for add to cart event.
 	 *
 	 * @see Tag::prepare_request_data()

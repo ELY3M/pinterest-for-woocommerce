@@ -8,6 +8,7 @@
 
 namespace Automattic\WooCommerce\Pinterest\Admin;
 
+use Automattic\WooCommerce\Pinterest\ManualConfig;
 use Automattic\WooCommerce\Pinterest\PluginHelper;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -69,7 +70,7 @@ class ActivationRedirect {
 		}
 
 		// Do not redirect if we already are in the Get Started page.
-		if ( $this->is_onboarding_page() && $this->did_redirect_setting() ) {
+		if ( ManualConfig::is_config_page() && $this->did_redirect_setting() ) {
 			$this->update_did_redirect_setting( false );
 			return;
 		}
@@ -88,13 +89,13 @@ class ActivationRedirect {
 	 */
 	protected function redirect_to_onboarding_page(): void {
 		// If we are already on the onboarding page, do nothing.
-		if ( $this->is_onboarding_page() ) {
+		if ( ManualConfig::is_config_page() ) {
 			return;
 		}
 
 		$this->update_did_redirect_setting( true );
 
-		wp_safe_redirect( admin_url( add_query_arg( $this->onboarding_page_parameters(), 'admin.php' ) ) );
+		wp_safe_redirect( ManualConfig::get_page_url() );
 		exit();
 	}
 

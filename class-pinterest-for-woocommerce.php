@@ -293,6 +293,9 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce' ) ) :
 
 			$this->includes();
 
+			// Manual configuration (account IDs, Pinterest Tag, access token) replaces the Pinterest "Connect" flow.
+			Pinterest\ManualConfig::init();
+
 			add_action( 'admin_init', array( $this, 'admin_init' ), 0 );
 			add_action( 'rest_api_init', array( $this, 'init_api_endpoints' ) );
 			add_action( 'wp_head', array( $this, 'maybe_inject_verification_code' ) );
@@ -755,7 +758,7 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce' ) ) :
 		public function init_api_endpoints() {
 			new Pinterest\API\Advertisers();
 			new Pinterest\API\AdvertiserConnect();
-			new Pinterest\API\Auth();
+			//new Pinterest\API\Auth(); //this NEVER worked for me!!!  look at https://github.com/woocommerce/pinterest-for-woocommerce/issues/1141
 			new Pinterest\API\AuthDisconnect();
 			new Pinterest\API\Businesses();
 			new Pinterest\API\DomainVerification();

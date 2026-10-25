@@ -65,7 +65,7 @@ class Onboarding extends Task {
 		if ( $this->is_complete() ) {
 			$action_url = admin_url( 'admin.php?page=wc-admin&path=/pinterest/catalog' );
 		} else {
-			$action_url = admin_url( 'admin.php?page=wc-admin&path=/pinterest/landing' );
+			$action_url = \Automattic\WooCommerce\Pinterest\ManualConfig::get_page_url();
 		}
 		return $action_url;
 	}

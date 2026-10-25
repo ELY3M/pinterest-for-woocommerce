@@ -35,7 +35,7 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce_Admin' ) ) :
 		 */
 		public function __construct() {
 			add_action( 'admin_enqueue_scripts', array( $this, 'load_admin_assets' ) );
-			add_action( 'admin_init', array( $this, 'maybe_redirect_to_middleware' ) );
+			///add_action( 'admin_init', array( $this, 'maybe_redirect_to_middleware' ) );
 			add_filter( 'woocommerce_get_registered_extended_tasks', array( $this, 'register_task_list_item' ), 10, 1 );
 			add_filter( 'admin_footer', array( $this, 'load_settings' ) );
 			add_filter( 'woocommerce_marketing_menu_items', array( $this, 'add_menu_items' ) );
@@ -241,7 +241,7 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce_Admin' ) ) :
 		 * @return array
 		 */
 		public function plugin_action_links( $links ) {
-			$url = admin_url( 'admin.php?page=wc-admin&path=/pinterest/landing' );
+			$url = \Automattic\WooCommerce\Pinterest\ManualConfig::get_page_url();
 
 			$settings_link = '<a href="' . esc_url( $url ) . '">' . esc_html__( 'Settings', 'pinterest-for-woocommerce' ) . '</a>';
 
@@ -379,6 +379,7 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce_Admin' ) ) :
 			return array(
 				'pluginVersion'            => PINTEREST_FOR_WOOCOMMERCE_VERSION,
 				'pluginUrl'                => Pinterest_For_Woocommerce()->plugin_url(),
+				'manualConfigUrl'          => \Automattic\WooCommerce\Pinterest\ManualConfig::get_page_url(),
 				'serviceLoginUrl'          => $this->get_service_login_url(),
 				'createBusinessAccountUrl' => $this->get_create_business_account_url(),
 				'switchBusinessAccountUrl' => $this->get_switch_business_account_url(),
@@ -430,15 +431,8 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce_Admin' ) ) :
 		 * @return string
 		 */
 		private function get_service_login_url() {
-			return add_query_arg(
-				array(
-					'page' => 'wc-admin',
-					'view' => 'wizard',
-					PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_go_to_service_login' => '1',
-					PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_nonce' => $this->get_middleware_url_nonce(),
-				),
-				admin_url( 'admin.php' )
-			);
+			// The Pinterest OAuth flow is replaced by the manual configuration page.
+			return \Automattic\WooCommerce\Pinterest\ManualConfig::get_page_url();
 		}
 
 
@@ -448,15 +442,8 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce_Admin' ) ) :
 		 * @return string
 		 */
 		private function get_create_business_account_url() {
-			return add_query_arg(
-				array(
-					'page' => 'wc-admin',
-					'view' => 'wizard',
-					PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_go_to_create_account' => '1',
-					PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_nonce' => $this->get_middleware_url_nonce(),
-				),
-				admin_url( 'admin.php' )
-			);
+			// The Pinterest OAuth flow is replaced by the manual configuration page.
+			return \Automattic\WooCommerce\Pinterest\ManualConfig::get_page_url();
 		}
 
 
@@ -466,15 +453,8 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce_Admin' ) ) :
 		 * @return string
 		 */
 		private function get_switch_business_account_url() {
-			return add_query_arg(
-				array(
-					'page' => 'wc-admin',
-					'view' => 'wizard',
-					PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_go_to_switch_account' => '1',
-					PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_nonce' => $this->get_middleware_url_nonce(),
-				),
-				admin_url( 'admin.php' )
-			);
+			// The Pinterest OAuth flow is replaced by the manual configuration page.
+			return \Automattic\WooCommerce\Pinterest\ManualConfig::get_page_url();
 		}
 
 		/**
@@ -503,36 +483,12 @@ if ( ! class_exists( 'Pinterest_For_Woocommerce_Admin' ) ) :
 
 
 		/**
-		 * Handles redirection to the Middleware App (Woo Connect Bridge).
+		 * Formerly handled redirection to the Middleware App (Woo Connect Bridge). Now a no-op.
 		 *
 		 * @return void
 		 */
 		public function maybe_redirect_to_middleware() {
-
-			if ( ! isset( $_GET[ PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_go_to_service_login' ] ) && ! isset( $_GET[ PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_go_to_create_account' ] ) && ! isset( $_GET[ PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_go_to_switch_account' ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended --- not needed
-				return;
-			}
-
-			if ( ! isset( $_GET[ PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_nonce' ] ) || ! wp_verify_nonce( sanitize_key( $_GET[ PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_nonce' ] ), 'go_to_middleware_url' ) || ! current_user_can( 'manage_woocommerce' ) ) {
-				wp_die( esc_html__( "Cheatin' huh?", 'pinterest-for-woocommerce' ) );
-			}
-
-			$context = 'login';
-
-			$args = array( 'view' => ! empty( $_REQUEST['view'] ) ? sanitize_key( $_REQUEST['view'] ) : null );
-
-			if ( isset( $_GET[ PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_go_to_create_account' ] ) ) {
-				$context = 'create_business';
-			} elseif ( isset( $_GET[ PINTEREST_FOR_WOOCOMMERCE_PREFIX . '_go_to_switch_account' ] ) && ! empty( $_GET['business_id'] ) ) {
-				$context             = 'switch_business';
-				$args['business_id'] = sanitize_key( $_GET['business_id'] );
-			}
-
-			add_filter( 'allowed_redirect_hosts', array( $this, 'allow_service_login' ) );
-
-			wp_safe_redirect( Pinterest_For_Woocommerce()::get_middleware_url( $context, $args ) );
-			exit;
-
+			// Disabled: the Pinterest OAuth connection is replaced by the manual configuration page.
 		}
 
 		/**

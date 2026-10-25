@@ -1,5 +1,10 @@
 *** Pinterest for WooCommerce Changelog ***
 
+= 1.6.0 (manual configuration build) =
+* Change - Removed the Pinterest "Connect" (OAuth) requirement. Added Marketing > Pinterest Setup, where the Ad Account ID, Pinterest Tag ID, user account ID, merchant ID and an API v5 access token are entered directly.
+* Change - A manually entered token is never auto-refreshed and is not wiped when Pinterest answers 401.
+* Change - Landing, onboarding and connection screens redirect to the new configuration page.
+
 = 1.6.0 - 2026-10-21 =
 * Add - Record the IDs of the Pinterest feeds the plugin creates and add the `wp wc pinterest feed list` and `wp wc pinterest feed delete` WP-CLI commands to inspect the connected ad account's feeds and delete one by ID.
 * Fix - Skip feeds Pinterest reports as deleted and read every feed page when matching the registered feed, so registration no longer re-attaches to a dead feed or creates a duplicate of one beyond the first page.

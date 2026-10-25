@@ -5,20 +5,20 @@
  * registers the activation and deactivation functions, and defines a function
  * that starts the plugin.
  *
- * @link              https://woocommerce.com
+ * @link              https://github.com/ELY3M/pinterest-for-woocommerce/tree/elys
  * @since             1.0.0
- * @package           woocommerce/pinterest-for-woocommerce
+ * @package           woocommerce/pinterest-for-woocommerce-elys
  *
  * @wordpress-plugin
- * Plugin Name:       Pinterest for WooCommerce
- * Plugin URI:        https://woocommerce.com/products/pinterest-for-woocommerce/
+ * Plugin Name:       Pinterest for WooCommerce with manual config
+ * Plugin URI:        https://github.com/ELY3M/pinterest-for-woocommerce/tree/elys
  * Description:       Grow your business on Pinterest! Use this official plugin to allow shoppers to Pin products while browsing your store, track conversions, and advertise on Pinterest.
  * Version:           1.6.0
  * Author:            WooCommerce
- * Author URI:        https://woocommerce.com
+ * Author URI:        https://github.com/ELY3M/pinterest-for-woocommerce/tree/elys
  * License:           GNU General Public License v3.0
  * License URI:       http://www.gnu.org/licenses/gpl-3.0.html
- * Text Domain:       pinterest-for-woocommerce
+ * Text Domain:       pinterest-for-woocommerce-elys
  * Domain Path:       /i18n/languages
  * Requires Plugins:  woocommerce
  *

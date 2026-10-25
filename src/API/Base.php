@@ -327,6 +327,15 @@ class Base {
 
 
 	/**
+	 * Clears the token cached for this request.
+	 *
+	 * @return void
+	 */
+	public static function reset_token() {
+		self::$token = null;
+	}
+
+	/**
 	 * Gets and caches the Token from the plugin's settings.
 	 *
 	 * @return mixed
